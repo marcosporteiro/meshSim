@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <style>
+    body {
+      margin: 0;
+      overflow: hidden;
+      background-color: #111;
+    }
+
+    canvas {
+      display: block;
+    }
+  </style>
+</head>
+<body>
+  <canvas id="clothCanvas"></canvas>
+
+  <script>
+    const canvas = document.getElementById('clothCanvas');
+    const ctx = canvas.getContext('2d');
+    
+    // Set canvas size
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+
+    const cloth = {
+      width: 75,
+      height: 30,
+      particles: [],
+      constraints: [],
+      gravity: 0.5,
+      mouseInfluence: 80,
+    };
+
+    // Initialize cloth particles
+    for (let y = 0; y < cloth.height; y++) {
+      for (let x = 0; x < cloth.width; x++) {
+        const particle = {
+          x: (canvas.width / 2) - (cloth.width * 10) + (x * 20),
+          y: 100 + y * 20,
+          prevX: (canvas.width / 2) - (cloth.width * 10) + (x * 20),
+          prevY: 100 + y * 20,
+          pinned: y == 0,
+        };
+
+        cloth.particles.push(particle);
+      }
+    }
+
+    // Initialize cloth constraints
+    for (let y = 0; y < cloth.height; y++) {
+      for (let x = 0; x < cloth.width; x++) {
+        if (x < cloth.width - 1) {
+          cloth.constraints.push([cloth.particles[y * cloth.width + x], cloth.particles[y * cloth.width + x + 1]]);
+        }
+        if (y < cloth.height - 1) {
+          cloth.constraints.push([cloth.particles[y * cloth.width + x], cloth.particles[(y + 1) * cloth.width + x]]);
+        }
+      }
+    }
+
+    // Mouse interaction
+    let isMouseDown = false;
+
+    canvas.addEventListener('mousedown', () => {
+      isMouseDown = true;
+    });
+
+    canvas.addEventListener('mouseup', () => {
+      isMouseDown = false;
+    });
+
+    canvas.addEventListener('mousemove', (e) => {
+      if (isMouseDown) {
+        perturbCloth(e.clientX, e.clientY);
+      }
+    });
+
+    function perturbCloth(mouseX, mouseY) {
+      for (const particle of cloth.particles) {
+        const distance = Math.sqrt((particle.x - mouseX) ** 2 + (particle.y - mouseY) ** 2);
+        if (distance < cloth.mouseInfluence) {
+          const angle = Math.atan2(mouseY - particle.y, mouseX - particle.x);
+          const force = (cloth.mouseInfluence - distance) * 0.1;
+          particle.x += Math.cos(angle) * force;
+          particle.y += Math.sin(angle) * force;
+        }
+      }
+    }
+
+    function update() {
+      // Apply gravity and update particle positions
+      for (const particle of cloth.particles) {
+        if (!particle.pinned) {
+          const vx = particle.x - particle.prevX;
+          const vy = particle.y - particle.prevY;
+
+          particle.prevX = particle.x;
+          particle.prevY = particle.y;
+
+          particle.x += vx;
+          particle.y += vy + cloth.gravity;
+        }
+      }
+
+      // Anchor the top row particles
+      for (let x = 0; x < cloth.width; x++) {
+        cloth.particles[x].x = (canvas.width / 2) - (cloth.width * 10) + (x * 20);
+        cloth.particles[x].y = 100;
+        cloth.particles[x].prevX = (canvas.width / 2) - (cloth.width * 10) + (x * 20);
+        cloth.particles[x].prevY = 100;
+      }
+
+      // Satisfy constraints
+      for (let i = 0; i < 5; i++) {
+        for (const constraint of cloth.constraints) {
+          satisfyConstraint(constraint[0], constraint[1]);
+        }
+      }
+    }
+
+    function satisfyConstraint(p1, p2) {
+      const dx = p2.x - p1.x;
+      const dy = p2.y - p1.y;
+      const distance = Math.sqrt(dx * dx + dy * dy);
+      const diff = (distance - 20) / distance;
+
+      p1.x += dx * 0.5 * diff;
+      p1.y += dy * 0.5 * diff;
+
+      p2.x -= dx * 0.5 * diff;
+      p2.y -= dy * 0.5 * diff;
+    }
+
+    function render() {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+      // Draw cloth
+      ctx.strokeStyle = '#fff';
+      ctx.lineWidth = 2;
+
+      for (const constraint of cloth.constraints) {
+        const p1 = constraint[0];
+        const p2 = constraint[1];
+
+        ctx.beginPath();
+        ctx.moveTo(p1.x, p1.y);
+        ctx.lineTo(p2.x, p2.y);
+        ctx.stroke();
+      }
+    }
+
+    function animate() {
+      update();
+      render();
+      requestAnimationFrame(animate);
+    }
+
+    // Start animation
+    animate();
+
+    // Resize canvas on window resize
+    window.addEventListener('resize', () => {
+      canvas.width = window.innerWidth;
+      canvas.height = window.innerHeight;
+    });
+  </script>
+</body>
+</html>
